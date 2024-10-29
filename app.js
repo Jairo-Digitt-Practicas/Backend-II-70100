@@ -10,16 +10,18 @@ const { create } = require("express-handlebars");
 const productsRouter = require("./src/routes/products.router.js");
 const cartsRouter = require("./src/routes/carts.router.js");
 const viewsRouter = require("./src/routes/views.router.js");
+const {
+    updateProduct,
+    addProductToCart,
+} = require("./src/controllers/products.controller.js");
 const { Server } = require("socket.io");
 const path = require("path");
 const http = require("http");
-const { fileURLToPath } = require("url");
 const {
     getAllProducts,
     createProduct,
     deleteProduct,
 } = require("./src/controllers/products.controller.js");
-const authorize = require("../middleware/authorize.js");
 
 dotenv.config();
 
@@ -35,9 +37,6 @@ app.use(passport.initialize());
 
 connectDB();
 app.use("/api/sessions", sessionRouter);
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const hbs = create({
     extname: ".handlebars",
@@ -61,7 +60,6 @@ app.use("/api/products", productsRouter);
 app.use("/api/carts", cartsRouter);
 app.use("/", viewsRouter);
 
-// Middleware de autorización
 function authorize(role) {
     return (req, res, next) => {
         if (req.user.role !== role) {
@@ -71,40 +69,65 @@ function authorize(role) {
     };
 }
 
-// Rutas con autorización
-app.post("/products", authorize("admin"), async (req, res) => {
-    try {
-        // Lógica para crear un producto
-        const newProduct = await createProduct(req.body);
-        res.status(201).json(newProduct);
-    } catch (error) {
-        res.status(500).json({ error: "Error al crear producto" });
+app.post(
+    "/products",
+    passport.authenticate("jwt", { session: false }),
+    authorize("admin"),
+    async (req, res) => {
+        const { title, description, code, price, status, stock, category } =
+            req.body;
+        if (!title || !description || !code || !price || !stock || !category) {
+            return res
+                .status(400)
+                .json({ error: "Datos del producto incompletos" });
+        }
+        try {
+            const newProduct = await createProduct({
+                title,
+                description,
+                code,
+                price,
+                status,
+                stock,
+                category,
+            });
+            res.status(201).json(newProduct);
+        } catch (error) {
+            res.status(500).json({ error: "Error al crear producto" });
+        }
     }
-});
+);
 
-app.put("/products/:id", authorize("admin"), async (req, res) => {
-    try {
-        // Lógica para actualizar un producto
-        const updatedProduct = await updateProduct(req.params.id, req.body);
-        res.status(200).json(updatedProduct);
-    } catch (error) {
-        res.status(500).json({ error: "Error al actualizar producto" });
+app.put(
+    "/products/:id",
+    passport.authenticate("jwt", { session: false }),
+    authorize("admin"),
+    async (req, res) => {
+        try {
+            const updatedProduct = await updateProduct(req.params.id, req.body);
+            res.status(200).json(updatedProduct);
+        } catch (error) {
+            res.status(500).json({ error: "Error al actualizar producto" });
+        }
     }
-});
+);
 
-app.delete("/products/:id", authorize("admin"), async (req, res) => {
-    try {
-        // Lógica para eliminar un producto
-        await deleteProduct(req.params.id);
-        res.status(204).json({ message: "Producto eliminado" });
-    } catch (error) {
-        res.status(500).json({ error: "Error al eliminar producto" });
+app.delete(
+    "/products/:id",
+    passport.authenticate("jwt", { session: false }),
+    authorize("admin"),
+    async (req, res) => {
+        try {
+            await deleteProduct(req.params.id);
+            res.status(204).json({ message: "Producto eliminado" });
+        } catch (error) {
+            res.status(500).json({ error: "Error al eliminar producto" });
+        }
     }
-});
+);
 
 app.post("/cart/:id/products", authorize("user"), async (req, res) => {
     try {
-        // Lógica para agregar un producto al carrito
         const updatedCart = await addProductToCart(req.params.id, req.body);
         res.status(200).json(updatedCart);
     } catch (error) {

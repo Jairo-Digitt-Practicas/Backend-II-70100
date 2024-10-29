@@ -1,12 +1,15 @@
 /** @format */
 
 const express = require("express");
-const isAuthenticated = require("../middlewares/passportMiddleware");
-
 const router = express.Router();
+const passport = require("passport");
 
-router.get("/", isAuthenticated, (req, res) => {
-    res.status(200).json({ user: req.user });
-});
+router.get(
+    "/",
+    passport.authenticate("jwt", { session: false }),
+    (req, res) => {
+        res.json(req.user);
+    }
+);
 
 module.exports = router;

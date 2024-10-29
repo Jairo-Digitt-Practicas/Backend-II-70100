@@ -1,7 +1,6 @@
 /** @format */
 const Product = require("../models/Product.js");
 
-// Obtener todos los productos con paginación
 const getAllProducts = async (filter = {}, options = {}) => {
     try {
         const products = await Product.paginate(filter, options);
@@ -11,7 +10,6 @@ const getAllProducts = async (filter = {}, options = {}) => {
     }
 };
 
-// Obtener un producto por ID
 const getProductById = async (id) => {
     try {
         if (!id) {
@@ -28,7 +26,6 @@ const getProductById = async (id) => {
     }
 };
 
-// Crear un nuevo producto
 const createProduct = async (productData) => {
     const { title, price } = productData;
     if (!title || !price) {
@@ -43,7 +40,6 @@ const createProduct = async (productData) => {
     }
 };
 
-// Actualizar un producto por ID
 const updateProduct = async (id, productData) => {
     try {
         if (
@@ -66,7 +62,6 @@ const updateProduct = async (id, productData) => {
     }
 };
 
-// Eliminar un producto por ID
 const deleteProduct = async (productId) => {
     try {
         const deletedProduct = await Product.findByIdAndDelete(productId);

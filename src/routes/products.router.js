@@ -7,6 +7,8 @@ const {
     updateProduct,
     deleteProduct,
 } = require("../controllers/products.controller.js");
+const authorize = require("../middlewares/authorize.js");
+const passport = require("passport");
 
 const router = express.Router();
 
@@ -68,38 +70,60 @@ router.get("/:pid", async (req, res) => {
     }
 });
 
-router.post("/", async (req, res) => {
-    try {
-        const newProduct = await createProduct(req.body);
-        res.status(201).json(newProduct);
-    } catch (error) {
-        res.status(400).json({ error: "Error al crear el producto" });
-    }
-});
-
-router.put("/:pid", async (req, res) => {
-    try {
-        const updatedProduct = await updateProduct(req.params.pid, req.body);
-        if (!updatedProduct) {
-            return res.status(404).json({ error: "Producto no encontrado" });
+router.post(
+    "/",
+    passport.authenticate("jwt", { session: false }),
+    authorize("admin"),
+    async (req, res) => {
+        try {
+            const newProduct = await createProduct(req.body);
+            res.status(201).json(newProduct);
+        } catch (error) {
+            res.status(500).json({ error: "Error al crear producto" });
         }
-        res.json(updatedProduct);
-    } catch (error) {
-        res.status(400).json({ error: "Error al actualizar el producto" });
     }
-});
+);
 
-router.delete("/:pid", async (req, res) => {
-    try {
-        const result = await deleteProduct(req.params.pid);
-        if (!result) {
-            return res.status(404).json({ error: "Producto no encontrado" });
+router.put(
+    "/:pid",
+    passport.authenticate("jwt", { session: false }),
+    authorize("admin"),
+    async (req, res) => {
+        try {
+            const updatedProduct = await updateProduct(
+                req.params.pid,
+                req.body
+            );
+            if (!updatedProduct) {
+                return res
+                    .status(404)
+                    .json({ error: "Producto no encontrado" });
+            }
+            res.json(updatedProduct);
+        } catch (error) {
+            res.status(400).json({ error: "Error al actualizar el producto" });
         }
-        res.status(204).end();
-    } catch (error) {
-        console.error("Error al eliminar el producto:", error);
-        res.status(500).json({ error: "Error al eliminar el producto" });
     }
-});
+);
+
+router.delete(
+    "/:pid",
+    passport.authenticate("jwt", { session: false }),
+    authorize("admin"),
+    async (req, res) => {
+        try {
+            const result = await deleteProduct(req.params.pid);
+            if (!result) {
+                return res
+                    .status(404)
+                    .json({ error: "Producto no encontrado" });
+            }
+            res.status(204).end();
+        } catch (error) {
+            console.error("Error al eliminar el producto:", error);
+            res.status(500).json({ error: "Error al eliminar el producto" });
+        }
+    }
+);
 
 module.exports = router;

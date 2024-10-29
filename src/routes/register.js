@@ -19,12 +19,13 @@ router.post("/", async (req, res) => {
         console.log("Contraseña encriptada en el registro:", hashedPassword);
 
         const newUser = new User({
-            first_name,
-            last_name,
-            email,
-            age,
+            first_name: req.body.first_name,
+            last_name: req.body.last_name,
+            email: req.body.email,
+            age: req.body.age,
             password: hashedPassword,
-            role: "user",
+            cart: req.body.cart,
+            role: req.body.role || "user",
         });
 
         await newUser.save();

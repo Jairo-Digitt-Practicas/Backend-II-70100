@@ -2,16 +2,14 @@
 const mongoose = require("mongoose");
 const Cart = require("../models/Cart.js");
 const Product = require("../models/Product.js");
+const Ticket = require("../models/Ticket.js");
 
-// Verifica si un ID es válido
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-// Obtener todos los carritos
 const getAllCarts = async () => {
     return await Cart.find().populate("products.product");
 };
 
-// Crear un nuevo carrito
 const createCart = async (cartData) => {
     try {
         const newCart = new Cart(cartData);
@@ -21,7 +19,6 @@ const createCart = async (cartData) => {
     }
 };
 
-// Obtener un carrito por ID
 const getCartById = async (cartId) => {
     console.log("ID recibido:", cartId);
     if (!isValidObjectId(cartId)) {
@@ -39,7 +36,6 @@ const getCartById = async (cartId) => {
     }
 };
 
-// Agregar un producto al carrito
 const addProductToCart = async (cid, pid) => {
     if (!isValidObjectId(cid) || !isValidObjectId(pid)) {
         return { error: "ID del carrito o del producto no es válido" };
@@ -70,7 +66,6 @@ const addProductToCart = async (cid, pid) => {
     }
 };
 
-// Actualizar los productos del carrito
 const updateCartProducts = async (cid, products) => {
     if (!isValidObjectId(cid)) {
         return { error: "ID del carrito no es válido" };
@@ -90,7 +85,6 @@ const updateCartProducts = async (cid, products) => {
     }
 };
 
-// Actualizar la cantidad de un producto en el carrito
 const updateProductQuantityInCart = async (cid, pid, quantity) => {
     if (!isValidObjectId(cid) || !isValidObjectId(pid)) {
         return { error: "ID del carrito o del producto no es válido" };
@@ -118,7 +112,6 @@ const updateProductQuantityInCart = async (cid, pid, quantity) => {
     }
 };
 
-// Eliminar un producto del carrito
 const deleteProductFromCart = async (cid, pid) => {
     if (!isValidObjectId(cid) || !isValidObjectId(pid)) {
         return { error: "ID del carrito o del producto no es válido" };
@@ -140,7 +133,6 @@ const deleteProductFromCart = async (cid, pid) => {
     }
 };
 
-// Eliminar todos los productos del carrito
 const deleteAllProductsFromCart = async (cid) => {
     if (!isValidObjectId(cid)) {
         return { error: "ID del carrito no es válido" };
@@ -161,7 +153,6 @@ const deleteAllProductsFromCart = async (cid) => {
     }
 };
 
-// Remover un producto del carrito
 const removeProductFromCart = async (cid, pid) => {
     if (!isValidObjectId(cid) || !isValidObjectId(pid)) {
         return { error: "ID del carrito o del producto no es válido" };
@@ -187,6 +178,52 @@ const removeProductFromCart = async (cid, pid) => {
     }
 };
 
+const purchaseCart = async (cid) => {
+    if (!isValidObjectId(cid)) {
+        return { error: "ID del carrito no es válido" };
+    }
+    try {
+        const cart = await Cart.findById(cid).populate("products.product");
+        if (!cart) {
+            return { error: "Carrito no encontrado" };
+        }
+
+        let totalAmount = 0;
+        const productsProcessed = cart.products.filter((item) => {
+            if (item.product.stock >= item.quantity) {
+                totalAmount += item.quantity * item.product.price;
+                item.product.stock -= item.quantity; // Reducir stock del producto
+                return true;
+            }
+            return false;
+        });
+
+        if (productsProcessed.length > 0) {
+            const ticket = await Ticket.create({
+                user: cart.user,
+                products: productsProcessed.map((item) => ({
+                    product: item.product._id,
+                    quantity: item.quantity,
+                    price: item.product.price,
+                })),
+                total: totalAmount,
+                createdAt: new Date(),
+            });
+
+            await cart.save();
+            await Promise.all(
+                productsProcessed.map((item) => item.product.save())
+            );
+
+            return { message: "Compra finalizada", ticket };
+        } else {
+            return { message: "No hay productos disponibles para comprar" };
+        }
+    } catch (error) {
+        throw new Error("Error al procesar la compra: " + error.message);
+    }
+};
+
 module.exports = {
     getAllCarts,
     createCart,
@@ -197,4 +234,5 @@ module.exports = {
     deleteProductFromCart,
     deleteAllProductsFromCart,
     removeProductFromCart,
+    purchaseCart,
 };

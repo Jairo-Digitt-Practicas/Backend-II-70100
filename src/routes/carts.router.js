@@ -11,9 +11,9 @@ const {
     deleteAllProductsFromCart,
 } = require("../controllers/carts.controller.js");
 
-const Cart = require("../models/Cart.js"); // Asegúrate de tener los modelos necesarios
+const Cart = require("../models/Cart.js");
 const Product = require("../models/Product.js");
-const Ticket = require("../models/Ticket.js"); // No olvides definir el modelo Ticket
+const Ticket = require("../models/Ticket.js");
 const router = Router();
 
 router.get("/", async (req, res) => {
@@ -30,6 +30,7 @@ router.post("/", async (req, res) => {
         const newCart = await createCart(req.body);
         res.status(201).json(newCart);
     } catch (error) {
+        console.error("Error al crear el carrito:", error);
         res.status(400).json({
             error: "Error al crear el carrito",
             details: error.message,
@@ -140,49 +141,69 @@ router.delete("/:cid", async (req, res) => {
     }
 });
 
-router.post("/:cid/purchase", async (req, res) => {
-    try {
-        const cartId = req.params.cid;
-        const cart = await Cart.findById(cartId).populate("products.product");
-        const unavailableProducts = [];
-
-        for (const item of cart.products) {
-            const product = await Product.findById(item.product._id);
-            if (product.stock < item.quantity) {
-                unavailableProducts.push(item.product._id);
-            } else {
-                product.stock -= item.quantity;
-                await product.save();
-            }
-        }
-
-        if (unavailableProducts.length < cart.products.length) {
-            const ticket = new Ticket({
-                code: generateUniqueCode(),
-                amount: cart.products.reduce(
-                    (total, p) => total + p.product.price * p.quantity,
-                    0
-                ),
-                purchaser: req.user.email,
-            });
-            await ticket.save();
-            res.status(201).json({ message: "Compra exitosa", ticket });
-        } else {
-            res.status(400).json({
-                message: "No hay suficiente stock para algunos productos",
-                unavailableProducts,
-            });
-        }
-    } catch (error) {
-        res.status(500).json({
-            error: "Error al procesar la compra",
-            details: error.message,
-        });
-    }
-});
-
 function generateUniqueCode() {
     return Math.random().toString(36).substr(2, 9).toUpperCase();
 }
+
+router.post("/:cid/purchase", async (req, res) => {
+    const { cid } = req.params;
+
+    try {
+        const cart = await Cart.findById(cid).populate("products.product");
+        if (!cart)
+            return res.status(404).json({ message: "Carrito no encontrado" });
+
+        if (!cart.user) {
+            return res
+                .status(400)
+                .json({ error: "El carrito no tiene asociado un usuario." });
+        }
+
+        let totalAmount = 0;
+        const productsNotProcessed = [];
+        const productsProcessed = [];
+
+        for (let item of cart.products) {
+            const product = item.product;
+
+            if (product && product.stock >= item.quantity) {
+                product.stock -= item.quantity;
+                await product.save();
+
+                totalAmount += product.price * item.quantity;
+
+                productsProcessed.push(item);
+            } else {
+                productsNotProcessed.push(product._id);
+            }
+        }
+
+        const ticket = await Ticket.create({
+            code: generateUniqueCode(),
+            user: cart.user,
+            products: productsProcessed.map((item) => ({
+                product: item.product._id,
+                quantity: item.quantity,
+                price: item.product.price,
+            })),
+            total: totalAmount,
+            createdAt: new Date(),
+        });
+
+        cart.products = cart.products.filter((item) =>
+            productsNotProcessed.includes(item.product._id)
+        );
+        await cart.save();
+
+        res.status(200).json({
+            message: "Compra finalizada",
+            ticket,
+            productsNotProcessed,
+        });
+    } catch (error) {
+        console.error("Error al finalizar la compra:", error);
+        res.status(500).json({ error: "Error al finalizar la compra" });
+    }
+});
 
 module.exports = router;
