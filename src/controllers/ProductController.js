@@ -1,39 +1,20 @@
 /** @format */
-const express = require("express");
-const {
-    getAllProducts,
-    getProductById,
-    createProduct,
-    updateProduct,
-    deleteProduct,
-} = require("../controllers/ProductController.js");
 
-const router = express.Router();
+const productService = require("../services/ProductService");
 
-router.get("/", async (req, res) => {
+exports.getAllProducts = async (req, res) => {
     try {
         const { limit = 10, page = 1, sort, query } = req.query;
-        let filter = {};
-        if (query) {
-            filter = {
-                $or: [
-                    { category: new RegExp(query, "i") },
-                    { status: query.toLowerCase() === "true" },
-                ],
-            };
-        }
+        const filter = query ? { category: new RegExp(query, "i") } : {};
         const options = {
             limit: parseInt(limit, 10),
             page: parseInt(page, 10),
-            sort:
-                sort === "asc"
-                    ? { price: 1 }
-                    : sort === "desc"
-                    ? { price: -1 }
-                    : {},
+            sort: sort === "asc" ? { price: 1 } : { price: -1 },
         };
-        const products = await getAllProducts(filter, options);
-        const response = {
+
+        const products = await productService.getAllProducts(filter, options);
+
+        res.json({
             status: "success",
             payload: products.docs,
             totalPages: products.totalPages,
@@ -48,16 +29,23 @@ router.get("/", async (req, res) => {
             nextLink: products.hasNextPage
                 ? `/products?limit=${limit}&page=${products.nextPage}&sort=${sort}&query=${query}`
                 : null,
-        };
-        res.json(response);
+        });
     } catch (error) {
+        console.error("Error al obtener productos:", error);
         res.status(500).json({ error: "Error al obtener productos" });
     }
-});
+};
 
-router.get("/:pid", async (req, res) => {
+const mongoose = require("mongoose");
+
+exports.getProductById = async (req, res) => {
     try {
-        const product = await getProductById(req.params.pid);
+        const { pid } = req.params;
+        console.log("ID recibido en el controlador:", pid);
+
+        const product = await productService.getProductById(pid);
+        console.log("Producto encontrado:", product);
+
         if (!product) {
             return res.status(404).json({ error: "Producto no encontrado" });
         }
@@ -66,40 +54,54 @@ router.get("/:pid", async (req, res) => {
         console.error("Error al obtener el producto:", error.message);
         res.status(500).json({ error: "Error al obtener el producto" });
     }
-});
+};
 
-router.post("/", async (req, res) => {
+exports.createProduct = async (req, res) => {
     try {
-        const newProduct = await createProduct(req.body);
-        res.status(201).json(newProduct);
+        const product = await productService.createProduct(req.body);
+        res.status(201).json(product);
     } catch (error) {
-        res.status(400).json({ error: "Error al crear el producto" });
+        res.status(500).json({ error: error.message });
     }
-});
+};
 
-router.put("/:pid", async (req, res) => {
+exports.updateProduct = async (req, res) => {
     try {
-        const updatedProduct = await updateProduct(req.params.pid, req.body);
+        const { pid } = req.params;
+        console.log("ID recibido para actualizar:", pid);
+
+        const updatedProduct = await productService.updateProduct(
+            pid,
+            req.body
+        );
+        console.log("Producto actualizado:", updatedProduct);
+
         if (!updatedProduct) {
             return res.status(404).json({ error: "Producto no encontrado" });
         }
+
         res.json(updatedProduct);
     } catch (error) {
-        res.status(400).json({ error: "Error al actualizar el producto" });
+        console.error("Error al actualizar el producto:", error.message);
+        res.status(500).json({ error: "Error al actualizar el producto" });
     }
-});
+};
 
-router.delete("/:pid", async (req, res) => {
+exports.deleteProduct = async (req, res) => {
     try {
-        const result = await deleteProduct(req.params.pid);
-        if (!result) {
+        const { pid } = req.params;
+        console.log("ID recibido para eliminar:", pid);
+
+        const deletedProduct = await productService.deleteProduct(pid);
+        console.log("Producto eliminado:", deletedProduct);
+
+        if (!deletedProduct) {
             return res.status(404).json({ error: "Producto no encontrado" });
         }
+
         res.status(204).end();
     } catch (error) {
-        console.error("Error al eliminar el producto:", error);
+        console.error("Error al eliminar el producto:", error.message);
         res.status(500).json({ error: "Error al eliminar el producto" });
     }
-});
-
-module.exports = router;
+};

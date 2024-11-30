@@ -10,18 +10,16 @@ const { create } = require("express-handlebars");
 const productsRouter = require("./src/routes/products.router.js");
 const cartsRouter = require("./src/routes/carts.router.js");
 const viewsRouter = require("./src/routes/views.router.js");
-const {
-    updateProduct,
-    addProductToCart,
-} = require("./src/controllers/products.controller.js");
-const { Server } = require("socket.io");
-const path = require("path");
-const http = require("http");
+const mocksRouter = require("./src/routes/mocks.router.js");
 const {
     getAllProducts,
     createProduct,
     deleteProduct,
-} = require("./src/controllers/products.controller.js");
+    updateProduct,
+} = require("./src/controllers/ProductController.js");
+const { Server } = require("socket.io");
+const path = require("path");
+const http = require("http");
 
 dotenv.config();
 
@@ -34,10 +32,11 @@ app.use(cookieParser());
 app.use(cors({ credentials: true, origin: "http://localhost:5173" }));
 require("./src/config/passport.js");
 app.use(passport.initialize());
+app.use("/api/mocks", mocksRouter);
 
 connectDB();
 app.use("/api/sessions", sessionRouter);
-
+app.use(express.json());
 const hbs = create({
     extname: ".handlebars",
     defaultLayout: "main",
@@ -52,7 +51,6 @@ const hbs = create({
 app.engine(".handlebars", hbs.engine);
 app.set("view engine", ".handlebars");
 app.set("views", path.join(__dirname, "views"));
-app.use(express.json());
 app.use(express.static(path.join(process.cwd(), "public")));
 app.use(express.urlencoded({ extended: true }));
 
@@ -267,7 +265,7 @@ io.on("connection", (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
     console.log(`Servidor corriendo en el puerto ${PORT}`);
 });

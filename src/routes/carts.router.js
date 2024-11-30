@@ -9,7 +9,7 @@ const {
     updateCartProducts,
     updateProductQuantityInCart,
     deleteAllProductsFromCart,
-} = require("../controllers/carts.controller.js");
+} = require("../controllers/CartController.js");
 
 const Cart = require("../models/Cart.js");
 const Product = require("../models/Product.js");
